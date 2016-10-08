@@ -24,7 +24,22 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-  Children = [
-    ?CHILD(erlycable_server, worker)
+  SizeArgs = [
+    {size, ?Config(pool_size, 50)},
+    {max_overflow, ?Config(max_overflow, 5)}
   ],
-  {ok, {{one_for_one, 5, 10}, Children}}.
+
+  PoolArgs = [
+    {name, {local, ?RPC_POOL}},
+    {worker_module, erlycable_rpc_worker}
+  ] ++ SizeArgs,
+
+  WorkerArgs = #{ host => ?Config(rpc_host, "localhost"), port => ?Config(rpc_port, 50051)},
+
+  PoolSpecs = [poolboy:child_spec(?RPC_POOL, PoolArgs, WorkerArgs)],
+
+  Children = [
+    ?CHILD(erlycable_server, worker),
+    ?CHILD(erlycable_ping, worker)
+  ],
+  {ok, {{one_for_one, 5, 10}, Children ++ PoolSpecs}}.

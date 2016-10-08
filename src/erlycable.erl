@@ -4,7 +4,7 @@
 -include_lib("erlycable/include/erlycable.hrl").
 -include_lib("erlycable/include/log.hrl").
 -include_lib("erlycable/include/priv.hrl").
--define(APPS, [lager, deliverly]).
+-define(APPS, [lager, deliverly, erlgrpc]).
 
 %% ------------------------------------------------------------------
 %% Common Application Function Exports
