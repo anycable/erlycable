@@ -31,7 +31,8 @@
 
 -record(state, {
   clients = #{} ::map(),
-  streams = #{} ::map()
+  streams = #{} ::map(),
+  stream_ids = #{} ::map()
 }).
 
 %% ------------------------------------------------------------------
@@ -69,19 +70,19 @@ handle_client_message(Client, Msg) ->
 
 handle_command(#de_client{data = #{ id := Identifiers }} = Client, #{ <<"command">> := <<"subscribe">>, <<"identifier">> := Channel }, Msg) ->
   case erlycable_rpc:subscribe(Identifiers, Channel, <<"">>) of
-    {ok, Reply} -> handle_reply(Client, Reply);
+    {ok, Reply} -> handle_reply(Client, Channel, Reply);
     Else -> Else
   end;
 
 handle_command(#de_client{data = #{ id := Identifiers }} = Client, #{ <<"command">> := <<"unsubscribe">>, <<"identifier">> := Channel }, Msg) ->
   case erlycable_rpc:unsubscribe(Identifiers, Channel) of
-    {ok, Reply} -> handle_reply(Client, Reply);
+    {ok, Reply} -> handle_reply(Client, Channel, Reply);
     Else -> Else
   end;
 
 handle_command(#de_client{data = #{ id := Identifiers }} = Client, #{ <<"command">> := <<"message">>, <<"identifier">> := Channel, <<"data">> := Data}, Msg) ->
   case erlycable_rpc:perform(Identifiers, Channel, Data) of
-    {ok, Reply} -> handle_reply(Client, Reply);
+    {ok, Reply} -> handle_reply(Client, Channel, Reply);
     Else -> Else
   end;
 
@@ -112,7 +113,7 @@ broadcast(Stream, Message) ->
 handle_call({join, Socket}, _From, #state{clients = Clients} = State) ->
   {reply, ok, State#state{ clients = Clients#{ Socket => #{ streams => [] } }}};
 
-handle_call({subscribe, Socket, Stream, StopAll}, _From, #state{streams = Streams, clients = Clients} = State) ->
+handle_call({subscribe, Socket, Channel, Stream, StopAll}, _From, #state{streams = Streams, clients = Clients, stream_ids = StreamIds} = State) ->
   ?I({subscribe, Stream, StopAll}),
   case {StopAll, maps:get(Socket, Clients, undefined)} of
     {_, undefined} -> {reply, ok, State};
@@ -121,13 +122,15 @@ handle_call({subscribe, Socket, Stream, StopAll}, _From, #state{streams = Stream
       NewStreams2 = add_client_to_stream(NewStreams, Socket, Stream),
       {reply, ok, State#state{
         clients = Clients#{ Socket => #{ streams => [Stream] }},
-        streams = NewStreams2}
+        streams = NewStreams2,
+        stream_ids = add_stream_identifier(StreamIds, Stream, Channel)}
       };
-    {false, #{ streams := ClientStreams }} ->
+    {_, #{ streams := ClientStreams }} ->
       NewStreams = add_client_to_stream(Streams, Socket, Stream),
       {reply, ok, State#state{
         clients = Clients#{ Socket => #{ streams => [Stream|ClientStreams] }},
-        streams = NewStreams}
+        streams = NewStreams,
+        stream_ids = add_stream_identifier(StreamIds, Stream, Channel)}
       }
   end;
 
@@ -157,11 +160,13 @@ handle_cast({broadcast, Msg}, #state{clients = Clients} = State) ->
   [Socket ! {handle_message, {text, Msg}} || Socket <- maps:keys(Clients)],
   {noreply, State};
 
-handle_cast({broadcast, Stream, Msg}, #state{streams = Streams} = State) ->
+handle_cast({broadcast, Stream, Msg}, #state{streams = Streams, stream_ids = StreamIds} = State) ->
   case maps:get(Stream, Streams, undefined) of
     undefined -> {noreply, State};
     Clients -> 
-      [Socket ! {handle_message, {text, Msg}} || Socket <- maps:keys(Clients)],
+      Channel = maps:get(Stream, StreamIds),
+      ChannelMsg = jsx:encode(#{ identifier => Channel, message => jsx:decode(Msg) }),
+      [Socket ! {handle_message, {text, ChannelMsg}} || Socket <- maps:keys(Clients)],
       {noreply, State}
   end;
 
@@ -185,26 +190,26 @@ transmit(#de_client{socket = Socket}, Transmissions) ->
   [Socket ! {handle_message, {text, Msg}} || Msg <- Transmissions],
   ok.
 
--spec handle_reply(Client::client(), Reply::#'CommandResponse'{}) -> ok | {error, Reason::atom()}.
-handle_reply(Client, #'CommandResponse'{status = 'ERROR'}) -> ok;
+-spec handle_reply(Client::client(), Channel::binary(), Reply::#'CommandResponse'{}) -> ok | {error, Reason::atom()}.
+handle_reply(Client, Channel, #'CommandResponse'{status = 'ERROR'}) -> ok;
 
-handle_reply(Client, #'CommandResponse'{disconnect = true}) ->
+handle_reply(Client, Channel, #'CommandResponse'{disconnect = true}) ->
   de_client:close(Client),
   ok;
 
-handle_reply(Client, #'CommandResponse'{stop_streams = StopStreams, stream_from = StreamFrom, stream_id = StreamId, transmissions = Transmissions}) ->
+handle_reply(Client, Channel, #'CommandResponse'{stop_streams = StopStreams, stream_from = StreamFrom, stream_id = StreamId, transmissions = Transmissions}) ->
   ?I({reply, StreamFrom, StreamId, StopStreams, Transmissions}),
-  case handle_streams(Client, StopStreams, StreamFrom, StreamId) of
+  case handle_streams(Client, Channel, StopStreams, StreamFrom, StreamId) of
     ok -> transmit(Client, Transmissions),
           ok;
     Else -> Else
   end.
 
--spec handle_streams(Client::client(), StopStreams::boolean() | undefined, StreamFrom::boolean() | undefined, StreamId::binary() | undefined) -> ok | {error, Reason::atom()}.
-handle_streams(#de_client{socket = Socket} = Client, StopStreams, true, StreamId) ->
-  gen_server:call(?SERVER, {subscribe, Socket, StreamId, StopStreams});
+-spec handle_streams(Client::client(), Channel::binary(), StopStreams::boolean() | undefined, StreamFrom::boolean() | undefined, StreamId::binary() | undefined) -> ok | {error, Reason::atom()}.
+handle_streams(#de_client{socket = Socket} = Client, Channel, StopStreams, true, StreamId) ->
+  gen_server:call(?SERVER, {subscribe, Socket, Channel, StreamId, StopStreams});
 
-handle_streams(_, _, _, _) -> ok.
+handle_streams(_, _, _, _, _) -> ok.
 
 -spec remove_client_from_streams(Streams::map(), Socket::pid(), ClientStreams::list()) -> NewStreams::map().
 remove_client_from_streams(Streams, Socket, []) -> Streams;
@@ -219,6 +224,10 @@ remove_client_from_streams(Streams, Socket, [Stream|ClientStreams]) ->
 add_client_to_stream(Streams, Socket, Stream) -> 
   Clients = maps:get(Stream, Streams, #{}),
   Streams#{ Stream => Clients#{ Socket => 1 } }.
+
+-spec add_stream_identifier(StreamIds::map(), Stream::binary(), Id::binary()) -> NewStreamIds::map().
+add_stream_identifier(StreamIds, Stream, Id) ->
+  maps:put(Stream, Id, StreamIds).
 
 -ifdef(TEST).
 
