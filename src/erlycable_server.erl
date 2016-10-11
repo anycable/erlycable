@@ -113,19 +113,11 @@ broadcast(Stream, Message) ->
 handle_call({join, Socket}, _From, #state{clients = Clients} = State) ->
   {reply, ok, State#state{ clients = Clients#{ Socket => #{ streams => [] } }}};
 
-handle_call({subscribe, Socket, Channel, Stream, StopAll}, _From, #state{streams = Streams, clients = Clients, stream_ids = StreamIds} = State) ->
-  ?I({subscribe, Stream, StopAll}),
-  case {StopAll, maps:get(Socket, Clients, undefined)} of
-    {_, undefined} -> {reply, ok, State};
-    {true, #{ streams := ClientStreams }} ->
-      NewStreams = remove_client_from_streams(Streams, Socket, ClientStreams),
-      NewStreams2 = add_client_to_stream(NewStreams, Socket, Stream),
-      {reply, ok, State#state{
-        clients = Clients#{ Socket => #{ streams => [Stream] }},
-        streams = NewStreams2,
-        stream_ids = add_stream_identifier(StreamIds, Stream, Channel)}
-      };
-    {_, #{ streams := ClientStreams }} ->
+handle_call({subscribe, Socket, Channel, Stream}, _From, #state{streams = Streams, clients = Clients, stream_ids = StreamIds} = State) ->
+  ?I({subscribe, Stream}),
+  case maps:get(Socket, Clients, undefined) of
+    undefined -> {reply, ok, State};
+    #{ streams := ClientStreams } ->
       NewStreams = add_client_to_stream(Streams, Socket, Stream),
       {reply, ok, State#state{
         clients = Clients#{ Socket => #{ streams => [Stream|ClientStreams] }},
@@ -134,13 +126,13 @@ handle_call({subscribe, Socket, Channel, Stream, StopAll}, _From, #state{streams
       }
   end;
 
-handle_call({unsubscribe, Socket, Stream}, _From, #state{streams = Streams, clients = Clients} = State) ->
+handle_call({unsubscribe, Socket}, _From, #state{streams = Streams, clients = Clients} = State) ->
   case maps:get(Socket, Clients, undefined) of
     undefined -> {reply, ok, State};
     #{ streams := ClientStreams } ->
-      NewStreams = remove_client_from_streams(Streams, Socket, [Stream]),
+      NewStreams = remove_client_from_streams(Streams, Socket, [ClientStreams]),
       {reply, ok, State#state{
-        clients = Clients#{ Socket => #{ streams => lists:delete(Stream, ClientStreams) }},
+        clients = Clients#{ Socket => #{ streams => [] }},
         streams = NewStreams}
       }
   end;
@@ -197,19 +189,24 @@ handle_reply(Client, Channel, #'CommandResponse'{disconnect = true}) ->
   de_client:close(Client),
   ok;
 
-handle_reply(Client, Channel, #'CommandResponse'{stop_streams = StopStreams, stream_from = StreamFrom, stream_id = StreamId, transmissions = Transmissions}) ->
-  ?I({reply, StreamFrom, StreamId, StopStreams, Transmissions}),
-  case handle_streams(Client, Channel, StopStreams, StreamFrom, StreamId) of
+handle_reply(Client, Channel, #'CommandResponse'{stop_streams = StopStreams, streams = Streams, transmissions = Transmissions}) ->
+  ?I({reply, Streams, StopStreams, Transmissions}),
+  case handle_streams(Client, Channel, StopStreams, Streams) of
     ok -> transmit(Client, Transmissions),
           ok;
     Else -> Else
   end.
 
--spec handle_streams(Client::client(), Channel::binary(), StopStreams::boolean() | undefined, StreamFrom::boolean() | undefined, StreamId::binary() | undefined) -> ok | {error, Reason::atom()}.
-handle_streams(#de_client{socket = Socket} = Client, Channel, StopStreams, true, StreamId) ->
-  gen_server:call(?SERVER, {subscribe, Socket, Channel, StreamId, StopStreams});
+-spec handle_streams(Client::client(), Channel::binary(), StopStreams::boolean() | undefined, Streams::list()) -> ok | {error, Reason::atom()}.
+handle_streams(#de_client{socket = Socket} = Client, Channel, true, Streams) ->
+  gen_server:call(?SERVER, {unsubscribe, Socket}),
+  handle_streams(Client, Channel, false, Streams);
 
-handle_streams(_, _, _, _, _) -> ok.
+handle_streams(_, _, _, []) -> ok;
+
+handle_streams(#de_client{socket = Socket} = Client, Channel, _, [Stream|Streams]) ->
+  gen_server:call(?SERVER, {subscribe, Socket, Channel, Stream}),
+  handle_streams(Client, Channel, false, Streams).
 
 -spec remove_client_from_streams(Streams::map(), Socket::pid(), ClientStreams::list()) -> NewStreams::map().
 remove_client_from_streams(Streams, Socket, []) -> Streams;

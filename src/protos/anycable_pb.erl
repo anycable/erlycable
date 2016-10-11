@@ -86,8 +86,7 @@ e_msg_CommandResponse(Msg, TrUserData) ->
 
 e_msg_CommandResponse(#'CommandResponse'{status = F1,
 					 disconnect = F2, stop_streams = F3,
-					 stream_from = F4, stream_id = F5,
-					 transmissions = F6},
+					 streams = F4, transmissions = F5},
 		      Bin, TrUserData) ->
     B1 = if F1 == undefined -> Bin;
 	    true ->
@@ -104,21 +103,18 @@ e_msg_CommandResponse(#'CommandResponse'{status = F1,
 		TrF3 = id(F3, TrUserData),
 		e_type_bool(TrF3, <<B2/binary, 24>>)
 	 end,
-    B4 = if F4 == undefined -> B3;
-	    true ->
-		TrF4 = id(F4, TrUserData),
-		e_type_bool(TrF4, <<B3/binary, 32>>)
-	 end,
-    B5 = if F5 == undefined -> B4;
-	    true ->
-		TrF5 = id(F5, TrUserData),
-		e_type_string(TrF5, <<B4/binary, 42>>)
+    B4 = begin
+	   TrF4 = id(F4, TrUserData),
+	   if TrF4 == [] -> B3;
+	      true ->
+		  e_field_CommandResponse_streams(TrF4, B3, TrUserData)
+	   end
 	 end,
     begin
-      TrF6 = id(F6, TrUserData),
-      if TrF6 == [] -> B5;
+      TrF5 = id(F5, TrUserData),
+      if TrF5 == [] -> B4;
 	 true ->
-	     e_field_CommandResponse_transmissions(TrF6, B5,
+	     e_field_CommandResponse_transmissions(TrF5, B4,
 						   TrUserData)
       end
     end.
@@ -222,9 +218,17 @@ e_msg_DisconnectRequest(#'DisconnectRequest'{identifiers
       end
     end.
 
+e_field_CommandResponse_streams([Elem | Rest], Bin,
+				TrUserData) ->
+    Bin2 = <<Bin/binary, 34>>,
+    Bin3 = e_type_string(id(Elem, TrUserData), Bin2),
+    e_field_CommandResponse_streams(Rest, Bin3, TrUserData);
+e_field_CommandResponse_streams([], Bin, _TrUserData) ->
+    Bin.
+
 e_field_CommandResponse_transmissions([Elem | Rest],
 				      Bin, TrUserData) ->
-    Bin2 = <<Bin/binary, 50>>,
+    Bin2 = <<Bin/binary, 42>>,
     Bin3 = e_type_string(id(Elem, TrUserData), Bin2),
     e_field_CommandResponse_transmissions(Rest, Bin3,
 					  TrUserData);
@@ -440,244 +444,210 @@ d_msg_CommandResponse(Bin, TrUserData) ->
 				       id(undefined, TrUserData),
 				       id(undefined, TrUserData),
 				       id(undefined, TrUserData),
-				       id(undefined, TrUserData),
-				       id(undefined, TrUserData),
-				       id([], TrUserData), TrUserData).
+				       id([], TrUserData), id([], TrUserData),
+				       TrUserData).
 
 dfp_read_field_def_CommandResponse(<<8, Rest/binary>>,
-				   Z1, Z2, F1, F2, F3, F4, F5, F6,
-				   TrUserData) ->
+				   Z1, Z2, F1, F2, F3, F4, F5, TrUserData) ->
     d_field_CommandResponse_status(Rest, Z1, Z2, F1, F2, F3,
-				   F4, F5, F6, TrUserData);
+				   F4, F5, TrUserData);
 dfp_read_field_def_CommandResponse(<<16, Rest/binary>>,
-				   Z1, Z2, F1, F2, F3, F4, F5, F6,
-				   TrUserData) ->
+				   Z1, Z2, F1, F2, F3, F4, F5, TrUserData) ->
     d_field_CommandResponse_disconnect(Rest, Z1, Z2, F1, F2,
-				       F3, F4, F5, F6, TrUserData);
+				       F3, F4, F5, TrUserData);
 dfp_read_field_def_CommandResponse(<<24, Rest/binary>>,
-				   Z1, Z2, F1, F2, F3, F4, F5, F6,
-				   TrUserData) ->
+				   Z1, Z2, F1, F2, F3, F4, F5, TrUserData) ->
     d_field_CommandResponse_stop_streams(Rest, Z1, Z2, F1,
-					 F2, F3, F4, F5, F6, TrUserData);
-dfp_read_field_def_CommandResponse(<<32, Rest/binary>>,
-				   Z1, Z2, F1, F2, F3, F4, F5, F6,
-				   TrUserData) ->
-    d_field_CommandResponse_stream_from(Rest, Z1, Z2, F1,
-					F2, F3, F4, F5, F6, TrUserData);
+					 F2, F3, F4, F5, TrUserData);
+dfp_read_field_def_CommandResponse(<<34, Rest/binary>>,
+				   Z1, Z2, F1, F2, F3, F4, F5, TrUserData) ->
+    d_field_CommandResponse_streams(Rest, Z1, Z2, F1, F2,
+				    F3, F4, F5, TrUserData);
 dfp_read_field_def_CommandResponse(<<42, Rest/binary>>,
-				   Z1, Z2, F1, F2, F3, F4, F5, F6,
-				   TrUserData) ->
-    d_field_CommandResponse_stream_id(Rest, Z1, Z2, F1, F2,
-				      F3, F4, F5, F6, TrUserData);
-dfp_read_field_def_CommandResponse(<<50, Rest/binary>>,
-				   Z1, Z2, F1, F2, F3, F4, F5, F6,
-				   TrUserData) ->
+				   Z1, Z2, F1, F2, F3, F4, F5, TrUserData) ->
     d_field_CommandResponse_transmissions(Rest, Z1, Z2, F1,
-					  F2, F3, F4, F5, F6, TrUserData);
+					  F2, F3, F4, F5, TrUserData);
 dfp_read_field_def_CommandResponse(<<>>, 0, 0, F1, F2,
-				   F3, F4, F5, F6, TrUserData) ->
+				   F3, F4, F5, TrUserData) ->
     #'CommandResponse'{status = F1, disconnect = F2,
-		       stop_streams = F3, stream_from = F4, stream_id = F5,
-		       transmissions = lists_reverse(F6, TrUserData)};
+		       stop_streams = F3,
+		       streams = lists_reverse(F4, TrUserData),
+		       transmissions = lists_reverse(F5, TrUserData)};
 dfp_read_field_def_CommandResponse(Other, Z1, Z2, F1,
-				   F2, F3, F4, F5, F6, TrUserData) ->
+				   F2, F3, F4, F5, TrUserData) ->
     dg_read_field_def_CommandResponse(Other, Z1, Z2, F1, F2,
-				      F3, F4, F5, F6, TrUserData).
+				      F3, F4, F5, TrUserData).
 
 dg_read_field_def_CommandResponse(<<1:1, X:7,
 				    Rest/binary>>,
-				  N, Acc, F1, F2, F3, F4, F5, F6, TrUserData)
+				  N, Acc, F1, F2, F3, F4, F5, TrUserData)
     when N < 32 - 7 ->
     dg_read_field_def_CommandResponse(Rest, N + 7,
-				      X bsl N + Acc, F1, F2, F3, F4, F5, F6,
+				      X bsl N + Acc, F1, F2, F3, F4, F5,
 				      TrUserData);
 dg_read_field_def_CommandResponse(<<0:1, X:7,
 				    Rest/binary>>,
-				  N, Acc, F1, F2, F3, F4, F5, F6, TrUserData) ->
+				  N, Acc, F1, F2, F3, F4, F5, TrUserData) ->
     Key = X bsl N + Acc,
     case Key of
       8 ->
 	  d_field_CommandResponse_status(Rest, 0, 0, F1, F2, F3,
-					 F4, F5, F6, TrUserData);
+					 F4, F5, TrUserData);
       16 ->
 	  d_field_CommandResponse_disconnect(Rest, 0, 0, F1, F2,
-					     F3, F4, F5, F6, TrUserData);
+					     F3, F4, F5, TrUserData);
       24 ->
 	  d_field_CommandResponse_stop_streams(Rest, 0, 0, F1, F2,
-					       F3, F4, F5, F6, TrUserData);
-      32 ->
-	  d_field_CommandResponse_stream_from(Rest, 0, 0, F1, F2,
-					      F3, F4, F5, F6, TrUserData);
+					       F3, F4, F5, TrUserData);
+      34 ->
+	  d_field_CommandResponse_streams(Rest, 0, 0, F1, F2, F3,
+					  F4, F5, TrUserData);
       42 ->
-	  d_field_CommandResponse_stream_id(Rest, 0, 0, F1, F2,
-					    F3, F4, F5, F6, TrUserData);
-      50 ->
 	  d_field_CommandResponse_transmissions(Rest, 0, 0, F1,
-						F2, F3, F4, F5, F6, TrUserData);
+						F2, F3, F4, F5, TrUserData);
       _ ->
 	  case Key band 7 of
 	    0 ->
 		skip_varint_CommandResponse(Rest, 0, 0, F1, F2, F3, F4,
-					    F5, F6, TrUserData);
+					    F5, TrUserData);
 	    1 ->
 		skip_64_CommandResponse(Rest, 0, 0, F1, F2, F3, F4, F5,
-					F6, TrUserData);
+					TrUserData);
 	    2 ->
 		skip_length_delimited_CommandResponse(Rest, 0, 0, F1,
-						      F2, F3, F4, F5, F6,
+						      F2, F3, F4, F5,
 						      TrUserData);
 	    5 ->
 		skip_32_CommandResponse(Rest, 0, 0, F1, F2, F3, F4, F5,
-					F6, TrUserData)
+					TrUserData)
 	  end
     end;
 dg_read_field_def_CommandResponse(<<>>, 0, 0, F1, F2,
-				  F3, F4, F5, F6, TrUserData) ->
+				  F3, F4, F5, TrUserData) ->
     #'CommandResponse'{status = F1, disconnect = F2,
-		       stop_streams = F3, stream_from = F4, stream_id = F5,
-		       transmissions = lists_reverse(F6, TrUserData)}.
+		       stop_streams = F3,
+		       streams = lists_reverse(F4, TrUserData),
+		       transmissions = lists_reverse(F5, TrUserData)}.
 
 d_field_CommandResponse_status(<<1:1, X:7,
 				 Rest/binary>>,
-			       N, Acc, F1, F2, F3, F4, F5, F6, TrUserData)
+			       N, Acc, F1, F2, F3, F4, F5, TrUserData)
     when N < 57 ->
     d_field_CommandResponse_status(Rest, N + 7,
-				   X bsl N + Acc, F1, F2, F3, F4, F5, F6,
+				   X bsl N + Acc, F1, F2, F3, F4, F5,
 				   TrUserData);
 d_field_CommandResponse_status(<<0:1, X:7,
 				 Rest/binary>>,
-			       N, Acc, _, F2, F3, F4, F5, F6, TrUserData) ->
+			       N, Acc, _, F2, F3, F4, F5, TrUserData) ->
     <<Tmp:32/signed-native>> = <<(X bsl N +
 				    Acc):32/unsigned-native>>,
     NewFValue = d_enum_Status(Tmp),
     dfp_read_field_def_CommandResponse(Rest, 0, 0,
-				       NewFValue, F2, F3, F4, F5, F6,
-				       TrUserData).
+				       NewFValue, F2, F3, F4, F5, TrUserData).
 
 
 d_field_CommandResponse_disconnect(<<1:1, X:7,
 				     Rest/binary>>,
-				   N, Acc, F1, F2, F3, F4, F5, F6, TrUserData)
+				   N, Acc, F1, F2, F3, F4, F5, TrUserData)
     when N < 57 ->
     d_field_CommandResponse_disconnect(Rest, N + 7,
-				       X bsl N + Acc, F1, F2, F3, F4, F5, F6,
+				       X bsl N + Acc, F1, F2, F3, F4, F5,
 				       TrUserData);
 d_field_CommandResponse_disconnect(<<0:1, X:7,
 				     Rest/binary>>,
-				   N, Acc, F1, _, F3, F4, F5, F6, TrUserData) ->
+				   N, Acc, F1, _, F3, F4, F5, TrUserData) ->
     NewFValue = X bsl N + Acc =/= 0,
     dfp_read_field_def_CommandResponse(Rest, 0, 0, F1,
-				       NewFValue, F3, F4, F5, F6, TrUserData).
+				       NewFValue, F3, F4, F5, TrUserData).
 
 
 d_field_CommandResponse_stop_streams(<<1:1, X:7,
 				       Rest/binary>>,
-				     N, Acc, F1, F2, F3, F4, F5, F6, TrUserData)
+				     N, Acc, F1, F2, F3, F4, F5, TrUserData)
     when N < 57 ->
     d_field_CommandResponse_stop_streams(Rest, N + 7,
-					 X bsl N + Acc, F1, F2, F3, F4, F5, F6,
+					 X bsl N + Acc, F1, F2, F3, F4, F5,
 					 TrUserData);
 d_field_CommandResponse_stop_streams(<<0:1, X:7,
 				       Rest/binary>>,
-				     N, Acc, F1, F2, _, F4, F5, F6,
-				     TrUserData) ->
+				     N, Acc, F1, F2, _, F4, F5, TrUserData) ->
     NewFValue = X bsl N + Acc =/= 0,
     dfp_read_field_def_CommandResponse(Rest, 0, 0, F1, F2,
-				       NewFValue, F4, F5, F6, TrUserData).
+				       NewFValue, F4, F5, TrUserData).
 
 
-d_field_CommandResponse_stream_from(<<1:1, X:7,
-				      Rest/binary>>,
-				    N, Acc, F1, F2, F3, F4, F5, F6, TrUserData)
+d_field_CommandResponse_streams(<<1:1, X:7,
+				  Rest/binary>>,
+				N, Acc, F1, F2, F3, F4, F5, TrUserData)
     when N < 57 ->
-    d_field_CommandResponse_stream_from(Rest, N + 7,
-					X bsl N + Acc, F1, F2, F3, F4, F5, F6,
-					TrUserData);
-d_field_CommandResponse_stream_from(<<0:1, X:7,
-				      Rest/binary>>,
-				    N, Acc, F1, F2, F3, _, F5, F6,
-				    TrUserData) ->
-    NewFValue = X bsl N + Acc =/= 0,
-    dfp_read_field_def_CommandResponse(Rest, 0, 0, F1, F2,
-				       F3, NewFValue, F5, F6, TrUserData).
-
-
-d_field_CommandResponse_stream_id(<<1:1, X:7,
-				    Rest/binary>>,
-				  N, Acc, F1, F2, F3, F4, F5, F6, TrUserData)
-    when N < 57 ->
-    d_field_CommandResponse_stream_id(Rest, N + 7,
-				      X bsl N + Acc, F1, F2, F3, F4, F5, F6,
-				      TrUserData);
-d_field_CommandResponse_stream_id(<<0:1, X:7,
-				    Rest/binary>>,
-				  N, Acc, F1, F2, F3, F4, _, F6, TrUserData) ->
+    d_field_CommandResponse_streams(Rest, N + 7,
+				    X bsl N + Acc, F1, F2, F3, F4, F5,
+				    TrUserData);
+d_field_CommandResponse_streams(<<0:1, X:7,
+				  Rest/binary>>,
+				N, Acc, F1, F2, F3, F4, F5, TrUserData) ->
     Len = X bsl N + Acc,
     <<Bytes:Len/binary, Rest2/binary>> = Rest,
     NewFValue = binary:copy(Bytes),
     dfp_read_field_def_CommandResponse(Rest2, 0, 0, F1, F2,
-				       F3, F4, NewFValue, F6, TrUserData).
+				       F3, cons(NewFValue, F4, TrUserData), F5,
+				       TrUserData).
 
 
 d_field_CommandResponse_transmissions(<<1:1, X:7,
 					Rest/binary>>,
-				      N, Acc, F1, F2, F3, F4, F5, F6,
-				      TrUserData)
+				      N, Acc, F1, F2, F3, F4, F5, TrUserData)
     when N < 57 ->
     d_field_CommandResponse_transmissions(Rest, N + 7,
-					  X bsl N + Acc, F1, F2, F3, F4, F5, F6,
+					  X bsl N + Acc, F1, F2, F3, F4, F5,
 					  TrUserData);
 d_field_CommandResponse_transmissions(<<0:1, X:7,
 					Rest/binary>>,
-				      N, Acc, F1, F2, F3, F4, F5, F6,
-				      TrUserData) ->
+				      N, Acc, F1, F2, F3, F4, F5, TrUserData) ->
     Len = X bsl N + Acc,
     <<Bytes:Len/binary, Rest2/binary>> = Rest,
     NewFValue = binary:copy(Bytes),
     dfp_read_field_def_CommandResponse(Rest2, 0, 0, F1, F2,
-				       F3, F4, F5,
-				       cons(NewFValue, F6, TrUserData),
+				       F3, F4, cons(NewFValue, F5, TrUserData),
 				       TrUserData).
 
 
 skip_varint_CommandResponse(<<1:1, _:7, Rest/binary>>,
-			    Z1, Z2, F1, F2, F3, F4, F5, F6, TrUserData) ->
+			    Z1, Z2, F1, F2, F3, F4, F5, TrUserData) ->
     skip_varint_CommandResponse(Rest, Z1, Z2, F1, F2, F3,
-				F4, F5, F6, TrUserData);
+				F4, F5, TrUserData);
 skip_varint_CommandResponse(<<0:1, _:7, Rest/binary>>,
-			    Z1, Z2, F1, F2, F3, F4, F5, F6, TrUserData) ->
+			    Z1, Z2, F1, F2, F3, F4, F5, TrUserData) ->
     dfp_read_field_def_CommandResponse(Rest, Z1, Z2, F1, F2,
-				       F3, F4, F5, F6, TrUserData).
+				       F3, F4, F5, TrUserData).
 
 
 skip_length_delimited_CommandResponse(<<1:1, X:7,
 					Rest/binary>>,
-				      N, Acc, F1, F2, F3, F4, F5, F6,
-				      TrUserData)
+				      N, Acc, F1, F2, F3, F4, F5, TrUserData)
     when N < 57 ->
     skip_length_delimited_CommandResponse(Rest, N + 7,
-					  X bsl N + Acc, F1, F2, F3, F4, F5, F6,
+					  X bsl N + Acc, F1, F2, F3, F4, F5,
 					  TrUserData);
 skip_length_delimited_CommandResponse(<<0:1, X:7,
 					Rest/binary>>,
-				      N, Acc, F1, F2, F3, F4, F5, F6,
-				      TrUserData) ->
+				      N, Acc, F1, F2, F3, F4, F5, TrUserData) ->
     Length = X bsl N + Acc,
     <<_:Length/binary, Rest2/binary>> = Rest,
     dfp_read_field_def_CommandResponse(Rest2, 0, 0, F1, F2,
-				       F3, F4, F5, F6, TrUserData).
+				       F3, F4, F5, TrUserData).
 
 
 skip_32_CommandResponse(<<_:32, Rest/binary>>, Z1, Z2,
-			F1, F2, F3, F4, F5, F6, TrUserData) ->
+			F1, F2, F3, F4, F5, TrUserData) ->
     dfp_read_field_def_CommandResponse(Rest, Z1, Z2, F1, F2,
-				       F3, F4, F5, F6, TrUserData).
+				       F3, F4, F5, TrUserData).
 
 
 skip_64_CommandResponse(<<_:64, Rest/binary>>, Z1, Z2,
-			F1, F2, F3, F4, F5, F6, TrUserData) ->
+			F1, F2, F3, F4, F5, TrUserData) ->
     dfp_read_field_def_CommandResponse(Rest, Z1, Z2, F1, F2,
-				       F3, F4, F5, F6, TrUserData).
+				       F3, F4, F5, TrUserData).
 
 
 d_msg_CommandMessage(Bin, TrUserData) ->
@@ -1471,14 +1441,12 @@ merge_msg_CommandResponse(#'CommandResponse'{status =
 						 PFstatus,
 					     disconnect = PFdisconnect,
 					     stop_streams = PFstop_streams,
-					     stream_from = PFstream_from,
-					     stream_id = PFstream_id,
+					     streams = PFstreams,
 					     transmissions = PFtransmissions},
 			  #'CommandResponse'{status = NFstatus,
 					     disconnect = NFdisconnect,
 					     stop_streams = NFstop_streams,
-					     stream_from = NFstream_from,
-					     stream_id = NFstream_id,
+					     streams = NFstreams,
 					     transmissions = NFtransmissions},
 			  TrUserData) ->
     #'CommandResponse'{status =
@@ -1493,14 +1461,7 @@ merge_msg_CommandResponse(#'CommandResponse'{status =
 			   if NFstop_streams =:= undefined -> PFstop_streams;
 			      true -> NFstop_streams
 			   end,
-		       stream_from =
-			   if NFstream_from =:= undefined -> PFstream_from;
-			      true -> NFstream_from
-			   end,
-		       stream_id =
-			   if NFstream_id =:= undefined -> PFstream_id;
-			      true -> NFstream_id
-			   end,
+		       streams = 'erlang_++'(PFstreams, NFstreams, TrUserData),
 		       transmissions =
 			   'erlang_++'(PFtransmissions, NFtransmissions,
 				       TrUserData)}.
@@ -1629,8 +1590,7 @@ v_msg_DisconnectResponse(#'DisconnectResponse'{status =
 -dialyzer({nowarn_function,v_msg_CommandResponse/3}).
 v_msg_CommandResponse(#'CommandResponse'{status = F1,
 					 disconnect = F2, stop_streams = F3,
-					 stream_from = F4, stream_id = F5,
-					 transmissions = F6},
+					 streams = F4, transmissions = F5},
 		      Path, _) ->
     if F1 == undefined -> ok;
        true -> v_enum_Status(F1, [status | Path])
@@ -1641,18 +1601,19 @@ v_msg_CommandResponse(#'CommandResponse'{status = F1,
     if F3 == undefined -> ok;
        true -> v_type_bool(F3, [stop_streams | Path])
     end,
-    if F4 == undefined -> ok;
-       true -> v_type_bool(F4, [stream_from | Path])
-    end,
-    if F5 == undefined -> ok;
-       true -> v_type_string(F5, [stream_id | Path])
-    end,
-    if is_list(F6) ->
-	   _ = [v_type_string(Elem, [transmissions | Path])
-		|| Elem <- F6],
+    if is_list(F4) ->
+	   _ = [v_type_string(Elem, [streams | Path])
+		|| Elem <- F4],
 	   ok;
        true ->
-	   mk_type_error({invalid_list_of, string}, F6, Path)
+	   mk_type_error({invalid_list_of, string}, F4, Path)
+    end,
+    if is_list(F5) ->
+	   _ = [v_type_string(Elem, [transmissions | Path])
+		|| Elem <- F5],
+	   ok;
+       true ->
+	   mk_type_error({invalid_list_of, string}, F5, Path)
     end,
     ok.
 
@@ -1872,11 +1833,9 @@ get_msg_defs() ->
 	      type = bool, occurrence = optional, opts = []},
        #field{name = stop_streams, fnum = 3, rnum = 4,
 	      type = bool, occurrence = optional, opts = []},
-       #field{name = stream_from, fnum = 4, rnum = 5,
-	      type = bool, occurrence = optional, opts = []},
-       #field{name = stream_id, fnum = 5, rnum = 6,
-	      type = string, occurrence = optional, opts = []},
-       #field{name = transmissions, fnum = 6, rnum = 7,
+       #field{name = streams, fnum = 4, rnum = 5,
+	      type = string, occurrence = repeated, opts = []},
+       #field{name = transmissions, fnum = 5, rnum = 6,
 	      type = string, occurrence = repeated, opts = []}]},
      {{msg, 'CommandMessage'},
       [#field{name = command, fnum = 1, rnum = 2,
@@ -1944,11 +1903,9 @@ find_msg_def('CommandResponse') ->
 	    type = bool, occurrence = optional, opts = []},
      #field{name = stop_streams, fnum = 3, rnum = 4,
 	    type = bool, occurrence = optional, opts = []},
-     #field{name = stream_from, fnum = 4, rnum = 5,
-	    type = bool, occurrence = optional, opts = []},
-     #field{name = stream_id, fnum = 5, rnum = 6,
-	    type = string, occurrence = optional, opts = []},
-     #field{name = transmissions, fnum = 6, rnum = 7,
+     #field{name = streams, fnum = 4, rnum = 5,
+	    type = string, occurrence = repeated, opts = []},
+     #field{name = transmissions, fnum = 5, rnum = 6,
 	    type = string, occurrence = repeated, opts = []}];
 find_msg_def('CommandMessage') ->
     [#field{name = command, fnum = 1, rnum = 2,

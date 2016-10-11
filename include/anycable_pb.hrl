@@ -20,9 +20,8 @@
         {status                 :: 'ERROR' | 'SUCCESS' | integer() | undefined, % = 1, enum Status
          disconnect             :: boolean() | 0 | 1 | undefined, % = 2
          stop_streams           :: boolean() | 0 | 1 | undefined, % = 3
-         stream_from            :: boolean() | 0 | 1 | undefined, % = 4
-         stream_id              :: binary() | iolist() | undefined, % = 5
-         transmissions = []     :: [binary() | iolist()] % = 6
+         streams = []           :: [binary() | iolist()], % = 4
+         transmissions = []     :: [binary() | iolist()] % = 5
         }).
 -endif.
 
