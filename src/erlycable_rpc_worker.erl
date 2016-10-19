@@ -48,7 +48,12 @@ init(#{ host := Host, port := Port}) ->
   }.
 
 handle_call({invoke, Method, Data}, _From, #state{client=Client} = State) ->
-  {reply, erlgrpc:invoke(Client, Method, Data), State};
+  Res = erlgrpc:invoke(Client, Method, Data),
+  case Res of
+    %% restart process if no connection
+    {error, no_connection} -> {stop, no_connection, State};
+    _ -> {reply, Res, State}
+  end;
 
 handle_call(_Request, _From, State) ->
   {reply, ok, State}.

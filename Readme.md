@@ -26,11 +26,11 @@ rebar3 eunit && rebar3 ct
 Feature                  | Status 
 -------------------------|--------
 Connection Identifiers   | +
-Connection Request (cookies, params) | -
+Connection Request (cookies, params) | +
 Disconnect Handling | -
 Subscribe to channels | +
-Parameterized subscriptions | -
-Unsubscribe from channels | -
+Parameterized subscriptions | +
+Unsubscribe from channels | +
 Performing Channel Actions | +
 Streaming | +
 Usage of the same stream name for different channels | -

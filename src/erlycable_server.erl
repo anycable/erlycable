@@ -31,8 +31,7 @@
 
 -record(state, {
   clients = #{} ::map(),
-  streams = #{} ::map(),
-  stream_ids = #{} ::map()
+  streams = #{} ::map()
 }).
 
 %% ------------------------------------------------------------------
@@ -49,8 +48,11 @@ start_link() ->
 init(_) ->
   {ok, #state{}}.
 
-authorize(#de_client{socket = Socket} = Client, _) ->
-  case erlycable_rpc:connect(<<"">>, []) of
+authorize(#de_client{socket = Socket} = Client, #{ req := Req }) ->
+  Url = cowboy_req:url(Req),
+  Headers = fetch_headers(Req),
+  ?I({req_params, Url, Headers}),
+  case erlycable_rpc:connect(Url, Headers) of
     {ok, #'ConnectionResponse'{
       status = 'SUCCESS',
       identifiers = Identifiers,
@@ -68,19 +70,19 @@ handle_message(_,_) -> ok.
 handle_client_message(Client, Msg) -> 
   handle_command(Client, json_encoder:decode(Client, Msg), Msg).
 
-handle_command(#de_client{data = #{ id := Identifiers }} = Client, #{ <<"command">> := <<"subscribe">>, <<"identifier">> := Channel }, Msg) ->
+handle_command(#de_client{data = #{ id := Identifiers }} = Client, #{ <<"command">> := <<"subscribe">>, <<"identifier">> := Channel }, _Msg) ->
   case erlycable_rpc:subscribe(Identifiers, Channel, <<"">>) of
     {ok, Reply} -> handle_reply(Client, Channel, Reply);
     Else -> Else
   end;
 
-handle_command(#de_client{data = #{ id := Identifiers }} = Client, #{ <<"command">> := <<"unsubscribe">>, <<"identifier">> := Channel }, Msg) ->
+handle_command(#de_client{data = #{ id := Identifiers }} = Client, #{ <<"command">> := <<"unsubscribe">>, <<"identifier">> := Channel }, _Msg) ->
   case erlycable_rpc:unsubscribe(Identifiers, Channel) of
     {ok, Reply} -> handle_reply(Client, Channel, Reply);
     Else -> Else
   end;
 
-handle_command(#de_client{data = #{ id := Identifiers }} = Client, #{ <<"command">> := <<"message">>, <<"identifier">> := Channel, <<"data">> := Data}, Msg) ->
+handle_command(#de_client{data = #{ id := Identifiers }} = Client, #{ <<"command">> := <<"message">>, <<"identifier">> := Channel, <<"data">> := Data}, _Msg) ->
   case erlycable_rpc:perform(Identifiers, Channel, Data) of
     {ok, Reply} -> handle_reply(Client, Channel, Reply);
     Else -> Else
@@ -111,28 +113,36 @@ broadcast(Stream, Message) ->
   ok.
 
 handle_call({join, Socket}, _From, #state{clients = Clients} = State) ->
-  {reply, ok, State#state{ clients = Clients#{ Socket => #{ streams => [] } }}};
+  {reply, ok, State#state{ clients = Clients#{ Socket => #{ streams => #{} } }}};
 
-handle_call({subscribe, Socket, Channel, Stream}, _From, #state{streams = Streams, clients = Clients, stream_ids = StreamIds} = State) ->
+handle_call({subscribe, Socket, Channel, Stream}, _From, #state{streams = Streams, clients = Clients} = State) ->
   ?I({subscribe, Stream}),
   case maps:get(Socket, Clients, undefined) of
     undefined -> {reply, ok, State};
     #{ streams := ClientStreams } ->
-      NewStreams = add_client_to_stream(Streams, Socket, Stream),
+      NewStreams = add_client_to_stream(Streams, Socket, Channel, Stream),
       {reply, ok, State#state{
-        clients = Clients#{ Socket => #{ streams => [Stream|ClientStreams] }},
-        streams = NewStreams,
-        stream_ids = add_stream_identifier(StreamIds, Stream, Channel)}
+        clients = Clients#{
+          Socket => #{
+            streams => maps:put(
+              Channel,
+              [Stream|maps:get(Channel, ClientStreams, [])],
+              ClientStreams
+            ) 
+          }
+        },
+        streams = NewStreams
+        }
       }
   end;
 
-handle_call({unsubscribe, Socket}, _From, #state{streams = Streams, clients = Clients} = State) ->
+handle_call({unsubscribe, Socket, Channel}, _From, #state{streams = Streams, clients = Clients} = State) ->
   case maps:get(Socket, Clients, undefined) of
     undefined -> {reply, ok, State};
     #{ streams := ClientStreams } ->
-      NewStreams = remove_client_from_streams(Streams, Socket, [ClientStreams]),
+      NewStreams = remove_client_from_streams(Streams, Socket, maps:get(Channel, ClientStreams, [])),
       {reply, ok, State#state{
-        clients = Clients#{ Socket => #{ streams => [] }},
+        clients = Clients#{ Socket => #{ streams => maps:remove(Channel, ClientStreams) }},
         streams = NewStreams}
       }
   end;
@@ -152,13 +162,11 @@ handle_cast({broadcast, Msg}, #state{clients = Clients} = State) ->
   [Socket ! {handle_message, {text, Msg}} || Socket <- maps:keys(Clients)],
   {noreply, State};
 
-handle_cast({broadcast, Stream, Msg}, #state{streams = Streams, stream_ids = StreamIds} = State) ->
+handle_cast({broadcast, Stream, Msg}, #state{streams = Streams} = State) ->
   case maps:get(Stream, Streams, undefined) of
     undefined -> {noreply, State};
     Clients -> 
-      Channel = maps:get(Stream, StreamIds),
-      ChannelMsg = jsx:encode(#{ identifier => Channel, message => jsx:decode(Msg) }),
-      [Socket ! {handle_message, {text, ChannelMsg}} || Socket <- maps:keys(Clients)],
+      broadcast(jsx:decode(Msg), maps:to_list(Clients), #{}),
       {noreply, State}
   end;
 
@@ -177,15 +185,37 @@ code_change(_OldVsn, State, _Extra) ->
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
+-spec fetch_headers(Req::any()) -> list().
+fetch_headers(Req) ->
+  [{<<"Cookie">>, cowboy_req:header(<<"cookie">>, Req, <<"">>)}].
+
 -spec transmit(Client::client(), Transmissions::list()) -> ok.
 transmit(#de_client{socket = Socket}, Transmissions) ->
   [Socket ! {handle_message, {text, Msg}} || Msg <- Transmissions],
   ok.
 
--spec handle_reply(Client::client(), Channel::binary(), Reply::#'CommandResponse'{}) -> ok | {error, Reason::atom()}.
-handle_reply(Client, Channel, #'CommandResponse'{status = 'ERROR'}) -> ok;
+-spec broadcast(Msg::binary(), Clients::map(), Channels::map()) -> ok.
+broadcast(_, [], _) -> ok;
 
-handle_reply(Client, Channel, #'CommandResponse'{disconnect = true}) ->
+broadcast(Msg, [{Socket, Id}|Clients], Channels) ->
+  {ChannelMsg, NewChannels} = build_broadcast_message(maps:get(Id, Channels, undefined), Id, Msg, Channels),
+  Socket ! {handle_message, {text, ChannelMsg}},
+  broadcast(Msg, Clients, NewChannels).
+
+-spec build_broadcast_message(
+  Message::binary()|atom(), Id::binary(), Msg::any(), Channels::map()
+) -> {ChannelMsg::binary(), NewChannels::map()}.
+build_broadcast_message(undefined, Id, Msg, Channels) ->
+  ChannelMsg = jsx:encode(#{ identifier => Id, message =>  Msg}),
+  Channels2 = maps:put(Id, ChannelMsg, Channels),
+  {ChannelMsg, Channels2};
+
+build_broadcast_message(ChannelMsg, _Id, _Msg, Channels) -> {ChannelMsg, Channels}.
+
+-spec handle_reply(Client::client(), Channel::binary(), Reply::#'CommandResponse'{}) -> ok | {error, Reason::atom()}.
+handle_reply(_Client, _Channel, #'CommandResponse'{status = 'ERROR'}) -> ok;
+
+handle_reply(Client, _Channel, #'CommandResponse'{disconnect = true}) ->
   de_client:close(Client),
   ok;
 
@@ -199,7 +229,7 @@ handle_reply(Client, Channel, #'CommandResponse'{stop_streams = StopStreams, str
 
 -spec handle_streams(Client::client(), Channel::binary(), StopStreams::boolean() | undefined, Streams::list()) -> ok | {error, Reason::atom()}.
 handle_streams(#de_client{socket = Socket} = Client, Channel, true, Streams) ->
-  gen_server:call(?SERVER, {unsubscribe, Socket}),
+  gen_server:call(?SERVER, {unsubscribe, Socket, Channel}),
   handle_streams(Client, Channel, false, Streams);
 
 handle_streams(_, _, _, []) -> ok;
@@ -209,7 +239,7 @@ handle_streams(#de_client{socket = Socket} = Client, Channel, _, [Stream|Streams
   handle_streams(Client, Channel, false, Streams).
 
 -spec remove_client_from_streams(Streams::map(), Socket::pid(), ClientStreams::list()) -> NewStreams::map().
-remove_client_from_streams(Streams, Socket, []) -> Streams;
+remove_client_from_streams(Streams, _Socket, []) -> Streams;
 
 remove_client_from_streams(Streams, Socket, [Stream|ClientStreams]) -> 
   case maps:get(Stream, Streams, undefined) of
@@ -217,14 +247,10 @@ remove_client_from_streams(Streams, Socket, [Stream|ClientStreams]) ->
     Clients -> remove_client_from_streams(Streams#{ Stream => maps:remove(Socket, Clients) }, Socket, ClientStreams)
   end.
 
--spec add_client_to_stream(Streams::map(), Socket::pid(), Stream::binary()) -> NewStreams::map().
-add_client_to_stream(Streams, Socket, Stream) -> 
+-spec add_client_to_stream(Streams::map(), Socket::pid(), Channel::binary(), Stream::binary()) -> NewStreams::map().
+add_client_to_stream(Streams, Socket, Channel, Stream) -> 
   Clients = maps:get(Stream, Streams, #{}),
-  Streams#{ Stream => Clients#{ Socket => 1 } }.
-
--spec add_stream_identifier(StreamIds::map(), Stream::binary(), Id::binary()) -> NewStreamIds::map().
-add_stream_identifier(StreamIds, Stream, Id) ->
-  maps:put(Stream, Id, StreamIds).
+  Streams#{ Stream => Clients#{ Socket => Channel } }.
 
 -ifdef(TEST).
 
@@ -246,12 +272,12 @@ add_client_to_stream_test() ->
   Socket2 = ?Pid(2),
   Streams = #{ <<"b">> => #{ Socket2 => 1 } },
   ?assertEqual(
-    #{ <<"a">> => #{ Socket => 1 }, <<"b">> => #{ Socket2 => 1 } },
-    add_client_to_stream(Streams, Socket, <<"a">>)
+    #{ <<"a">> => #{ Socket => <<"x">> }, <<"b">> => #{ Socket2 => 1 } },
+    add_client_to_stream(Streams, Socket, <<"x">>, <<"a">>)
   ),
   ?assertEqual(
-    #{ <<"b">> => #{ Socket2 => 1, Socket => 1 } },
-    add_client_to_stream(Streams, Socket, <<"b">>)
+    #{ <<"b">> => #{ Socket2 => 1, Socket => <<"x">> } },
+    add_client_to_stream(Streams, Socket,  <<"x">>, <<"b">>)
   ).
 
 -endif.
