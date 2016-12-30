@@ -92,8 +92,8 @@ handle_command(_, Data, _) ->
   ?E({unknown_command, Data}),
   ok.
 
-client_disconnected(#de_client{socket = Socket}) ->
-  gen_server:cast(?SERVER, {leave, Socket}),
+client_disconnected(#de_client{socket = Socket, data = #{ id := Identifiers }}) ->
+  gen_server:cast(?SERVER, {leave, Socket, Identifiers}),
   ok.
 
 %% @doc
@@ -150,11 +150,16 @@ handle_call({unsubscribe, Socket, Channel}, _From, #state{streams = Streams, cli
 handle_call(_Request, _From, State) ->
   {reply, unknown, State}.
 
-handle_cast({leave, Socket}, #state{clients = Clients, streams = Streams} = State) ->
+handle_cast({leave, Socket, Identifiers}, #state{clients = Clients, streams = Streams} = State) ->
   case maps:get(Socket, Clients, undefined) of
     undefined -> {noreply, State};
     #{ streams := ClientStreams } ->
-      NewStreams = remove_client_from_streams(Streams, Socket, ClientStreams),
+      NewStreams = remove_client_from_streams(
+        Streams,
+        Socket,
+        lists:flatten(maps:values(ClientStreams))
+      ),
+      erlycable_disconnector:disconnect(Identifiers, maps:keys(ClientStreams)),
       {noreply, #state{clients = maps:remove(Socket, Clients), streams = NewStreams}}
   end;
 

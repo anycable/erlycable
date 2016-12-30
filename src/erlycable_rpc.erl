@@ -31,7 +31,19 @@ connect(Path, Headers) ->
 %% @end
 -spec disconnect(Identifiers::binary(), Subscriptions::list()) -> {ok, #'DisconnectResponse'{}} | {error, any()}.
 disconnect(Identifiers, Subscriptions) ->
-  {error, not_implemented}.
+  Msg = anycable_pb:encode_msg(#'DisconnectRequest'{identifiers = Identifiers, subscriptions = Subscriptions}),
+  Res = poolboy:transaction(?RPC_POOL,
+    fun(Worker) ->
+      gen_server:call(Worker, {invoke, <<"/anycable.RPC/Disconnect">>, Msg})
+    end
+  ),
+  case Res of
+    {error, Reason} ->
+      ?E({rpc_error, Reason}),
+      {error, Reason};
+    {ok, Data} ->
+      {ok, anycable_pb:decode_msg(Data, 'DisconnectResponse')}
+  end.
 
 %% @doc
 %% Make 'Subscribe' call to RCP server.

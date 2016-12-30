@@ -41,6 +41,7 @@ init([]) ->
   Children = [
     ?CHILD(erlycable_server, worker),
     ?CHILD(erlycable_ping, worker),
-    ?CHILD(erlycable_subscriber, worker)
+    ?CHILD(erlycable_subscriber, worker),
+    ?CHILD(erlycable_disconnector, worker)
   ],
   {ok, {{one_for_one, 5, 10}, Children ++ PoolSpecs}}.
