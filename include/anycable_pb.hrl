@@ -56,7 +56,9 @@
 -define('DISCONNECTREQUEST_PB_H', true).
 -record('DisconnectRequest',
         {identifiers            :: binary() | iolist() | undefined, % = 1
-         subscriptions = []     :: [binary() | iolist()] % = 2
+         subscriptions = []     :: [binary() | iolist()], % = 2
+         path                   :: binary() | iolist() | undefined, % = 3
+         headers = []           :: [{binary() | iolist(), binary() | iolist()}] % = 4
         }).
 -endif.
 

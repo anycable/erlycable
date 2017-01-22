@@ -46,7 +46,7 @@ disconnect(Identifiers, Subscriptions) ->
   end.
 
 %% @doc
-%% Make 'Subscribe' call to RCP server.
+%% Make 'Command' call to RCP server with "subscribe" command.
 %% Register client subscription on success.
 %% @end
 -spec subscribe(Identifiers::binary(), Channel::binary(), Params::binary()) -> {ok, #'CommandResponse'{}} | {error, any()}.
@@ -56,10 +56,10 @@ subscribe(Identifiers, Channel, _Params) ->
     identifier = Channel,
     connection_identifiers = Identifiers
   }),
-  invoke_command(<<"/anycable.RPC/Subscribe">>, Msg).
+  invoke_command(<<"/anycable.RPC/Command">>, Msg).
 
 %% @doc
-%% Make 'Unsubscribe' call to RCP server.
+%% Make 'Command' call to RCP server with "unsubsribe" command.
 %% Unregister client subscription on success.
 %% @end
 -spec unsubscribe(Identifiers::binary(), Channel::binary()) -> {ok, #'CommandResponse'{}} | {error, any()}.
@@ -69,10 +69,10 @@ unsubscribe(Identifiers, Channel) ->
     identifier = Channel,
     connection_identifiers = Identifiers
   }),
-  invoke_command(<<"/anycable.RPC/Unsubscribe">>, Msg).
+  invoke_command(<<"/anycable.RPC/Command">>, Msg).
 
 %% @doc
-%% Make 'Message' call to RCP server.
+%% Make 'Command' call to RCP server with "message" command.
 %% @end
 -spec perform(Identifiers::binary(), Channel::binary(), Data::binary()) -> {ok, #'CommandResponse'{}} | {error, any()}.
 perform(Identifiers, Channel, Data) ->
@@ -82,7 +82,7 @@ perform(Identifiers, Channel, Data) ->
     connection_identifiers = Identifiers,
     data = Data
   }),
-  invoke_command(<<"/anycable.RPC/Perform">>, Msg).
+  invoke_command(<<"/anycable.RPC/Command">>, Msg).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
