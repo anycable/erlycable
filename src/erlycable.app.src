@@ -1,7 +1,7 @@
 {application, erlycable,
  [
-  {description, ""},
-  {vsn, "0.0.1"},
+  {description, "Erlang server for AnyCable (http://anycable.io)"},
+  {vsn, "0.4.0"},
   {registered, []},
   {applications, [
                   kernel,

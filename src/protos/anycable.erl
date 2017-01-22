@@ -190,19 +190,32 @@ e_msg_DisconnectRequest(Msg, TrUserData) ->
 
 e_msg_DisconnectRequest(#'DisconnectRequest'{identifiers
 						 = F1,
-					     subscriptions = F2},
+					     subscriptions = F2, path = F3,
+					     headers = F4},
 			Bin, TrUserData) ->
     B1 = if F1 == undefined -> Bin;
 	    true ->
 		TrF1 = id(F1, TrUserData),
 		e_type_string(TrF1, <<Bin/binary, 10>>)
 	 end,
+    B2 = begin
+	   TrF2 = id(F2, TrUserData),
+	   if TrF2 == [] -> B1;
+	      true ->
+		  e_field_DisconnectRequest_subscriptions(TrF2, B1,
+							  TrUserData)
+	   end
+	 end,
+    B3 = if F3 == undefined -> B2;
+	    true ->
+		TrF3 = id(F3, TrUserData),
+		e_type_string(TrF3, <<B2/binary, 26>>)
+	 end,
     begin
-      TrF2 = id(F2, TrUserData),
-      if TrF2 == [] -> B1;
+      TrF4 = id(F4, TrUserData),
+      if TrF4 == [] -> B3;
 	 true ->
-	     e_field_DisconnectRequest_subscriptions(TrF2, B1,
-						     TrUserData)
+	     e_field_DisconnectRequest_headers(TrF4, B3, TrUserData)
       end
     end.
 
@@ -262,6 +275,26 @@ e_field_DisconnectRequest_subscriptions([Elem | Rest],
 					    TrUserData);
 e_field_DisconnectRequest_subscriptions([], Bin,
 					_TrUserData) ->
+    Bin.
+
+e_mfield_DisconnectRequest_headers(Msg, Bin,
+				   TrUserData) ->
+    SubBin = 'e_msg_map<string,string>'(Msg, <<>>,
+					TrUserData),
+    Bin2 = e_varint(byte_size(SubBin), Bin),
+    <<Bin2/binary, SubBin/binary>>.
+
+e_field_DisconnectRequest_headers([Elem | Rest], Bin,
+				  TrUserData) ->
+    Bin2 = <<Bin/binary, 34>>,
+    Bin3 =
+	e_mfield_DisconnectRequest_headers('tr_encode_DisconnectRequest.headers[x]'(Elem,
+										    TrUserData),
+					   Bin2, TrUserData),
+    e_field_DisconnectRequest_headers(Rest, Bin3,
+				      TrUserData);
+e_field_DisconnectRequest_headers([], Bin,
+				  _TrUserData) ->
     Bin.
 
 
@@ -1127,133 +1160,204 @@ skip_64_ConnectionRequest(<<_:64, Rest/binary>>, Z1, Z2,
 d_msg_DisconnectRequest(Bin, TrUserData) ->
     dfp_read_field_def_DisconnectRequest(Bin, 0, 0,
 					 id(undefined, TrUserData),
-					 id([], TrUserData), TrUserData).
+					 id([], TrUserData),
+					 id(undefined, TrUserData),
+					 'tr_decode_init_default_DisconnectRequest.headers'([],
+											    TrUserData),
+					 TrUserData).
 
 dfp_read_field_def_DisconnectRequest(<<10,
 				       Rest/binary>>,
-				     Z1, Z2, F1, F2, TrUserData) ->
+				     Z1, Z2, F1, F2, F3, F4, TrUserData) ->
     d_field_DisconnectRequest_identifiers(Rest, Z1, Z2, F1,
-					  F2, TrUserData);
+					  F2, F3, F4, TrUserData);
 dfp_read_field_def_DisconnectRequest(<<18,
 				       Rest/binary>>,
-				     Z1, Z2, F1, F2, TrUserData) ->
+				     Z1, Z2, F1, F2, F3, F4, TrUserData) ->
     d_field_DisconnectRequest_subscriptions(Rest, Z1, Z2,
-					    F1, F2, TrUserData);
+					    F1, F2, F3, F4, TrUserData);
+dfp_read_field_def_DisconnectRequest(<<26,
+				       Rest/binary>>,
+				     Z1, Z2, F1, F2, F3, F4, TrUserData) ->
+    d_field_DisconnectRequest_path(Rest, Z1, Z2, F1, F2, F3,
+				   F4, TrUserData);
+dfp_read_field_def_DisconnectRequest(<<34,
+				       Rest/binary>>,
+				     Z1, Z2, F1, F2, F3, F4, TrUserData) ->
+    d_field_DisconnectRequest_headers(Rest, Z1, Z2, F1, F2,
+				      F3, F4, TrUserData);
 dfp_read_field_def_DisconnectRequest(<<>>, 0, 0, F1, F2,
-				     TrUserData) ->
+				     F3, F4, TrUserData) ->
     #'DisconnectRequest'{identifiers = F1,
-			 subscriptions = lists_reverse(F2, TrUserData)};
+			 subscriptions = lists_reverse(F2, TrUserData),
+			 path = F3,
+			 headers =
+			     'tr_decode_repeated_finalize_DisconnectRequest.headers'(F4,
+										     TrUserData)};
 dfp_read_field_def_DisconnectRequest(Other, Z1, Z2, F1,
-				     F2, TrUserData) ->
+				     F2, F3, F4, TrUserData) ->
     dg_read_field_def_DisconnectRequest(Other, Z1, Z2, F1,
-					F2, TrUserData).
+					F2, F3, F4, TrUserData).
 
 dg_read_field_def_DisconnectRequest(<<1:1, X:7,
 				      Rest/binary>>,
-				    N, Acc, F1, F2, TrUserData)
+				    N, Acc, F1, F2, F3, F4, TrUserData)
     when N < 32 - 7 ->
     dg_read_field_def_DisconnectRequest(Rest, N + 7,
-					X bsl N + Acc, F1, F2, TrUserData);
+					X bsl N + Acc, F1, F2, F3, F4,
+					TrUserData);
 dg_read_field_def_DisconnectRequest(<<0:1, X:7,
 				      Rest/binary>>,
-				    N, Acc, F1, F2, TrUserData) ->
+				    N, Acc, F1, F2, F3, F4, TrUserData) ->
     Key = X bsl N + Acc,
     case Key of
       10 ->
 	  d_field_DisconnectRequest_identifiers(Rest, 0, 0, F1,
-						F2, TrUserData);
+						F2, F3, F4, TrUserData);
       18 ->
 	  d_field_DisconnectRequest_subscriptions(Rest, 0, 0, F1,
-						  F2, TrUserData);
+						  F2, F3, F4, TrUserData);
+      26 ->
+	  d_field_DisconnectRequest_path(Rest, 0, 0, F1, F2, F3,
+					 F4, TrUserData);
+      34 ->
+	  d_field_DisconnectRequest_headers(Rest, 0, 0, F1, F2,
+					    F3, F4, TrUserData);
       _ ->
 	  case Key band 7 of
 	    0 ->
-		skip_varint_DisconnectRequest(Rest, 0, 0, F1, F2,
-					      TrUserData);
+		skip_varint_DisconnectRequest(Rest, 0, 0, F1, F2, F3,
+					      F4, TrUserData);
 	    1 ->
-		skip_64_DisconnectRequest(Rest, 0, 0, F1, F2,
+		skip_64_DisconnectRequest(Rest, 0, 0, F1, F2, F3, F4,
 					  TrUserData);
 	    2 ->
 		skip_length_delimited_DisconnectRequest(Rest, 0, 0, F1,
-							F2, TrUserData);
+							F2, F3, F4, TrUserData);
 	    5 ->
-		skip_32_DisconnectRequest(Rest, 0, 0, F1, F2,
+		skip_32_DisconnectRequest(Rest, 0, 0, F1, F2, F3, F4,
 					  TrUserData)
 	  end
     end;
 dg_read_field_def_DisconnectRequest(<<>>, 0, 0, F1, F2,
-				    TrUserData) ->
+				    F3, F4, TrUserData) ->
     #'DisconnectRequest'{identifiers = F1,
-			 subscriptions = lists_reverse(F2, TrUserData)}.
+			 subscriptions = lists_reverse(F2, TrUserData),
+			 path = F3,
+			 headers =
+			     'tr_decode_repeated_finalize_DisconnectRequest.headers'(F4,
+										     TrUserData)}.
 
 d_field_DisconnectRequest_identifiers(<<1:1, X:7,
 					Rest/binary>>,
-				      N, Acc, F1, F2, TrUserData)
+				      N, Acc, F1, F2, F3, F4, TrUserData)
     when N < 57 ->
     d_field_DisconnectRequest_identifiers(Rest, N + 7,
-					  X bsl N + Acc, F1, F2, TrUserData);
+					  X bsl N + Acc, F1, F2, F3, F4,
+					  TrUserData);
 d_field_DisconnectRequest_identifiers(<<0:1, X:7,
 					Rest/binary>>,
-				      N, Acc, _, F2, TrUserData) ->
+				      N, Acc, _, F2, F3, F4, TrUserData) ->
     Len = X bsl N + Acc,
     <<Utf8:Len/binary, Rest2/binary>> = Rest,
     NewFValue = unicode:characters_to_list(Utf8, unicode),
     dfp_read_field_def_DisconnectRequest(Rest2, 0, 0,
-					 NewFValue, F2, TrUserData).
+					 NewFValue, F2, F3, F4, TrUserData).
 
 
 d_field_DisconnectRequest_subscriptions(<<1:1, X:7,
 					  Rest/binary>>,
-					N, Acc, F1, F2, TrUserData)
+					N, Acc, F1, F2, F3, F4, TrUserData)
     when N < 57 ->
     d_field_DisconnectRequest_subscriptions(Rest, N + 7,
-					    X bsl N + Acc, F1, F2, TrUserData);
+					    X bsl N + Acc, F1, F2, F3, F4,
+					    TrUserData);
 d_field_DisconnectRequest_subscriptions(<<0:1, X:7,
 					  Rest/binary>>,
-					N, Acc, F1, F2, TrUserData) ->
+					N, Acc, F1, F2, F3, F4, TrUserData) ->
     Len = X bsl N + Acc,
     <<Utf8:Len/binary, Rest2/binary>> = Rest,
     NewFValue = unicode:characters_to_list(Utf8, unicode),
     dfp_read_field_def_DisconnectRequest(Rest2, 0, 0, F1,
-					 cons(NewFValue, F2, TrUserData),
+					 cons(NewFValue, F2, TrUserData), F3,
+					 F4, TrUserData).
+
+
+d_field_DisconnectRequest_path(<<1:1, X:7,
+				 Rest/binary>>,
+			       N, Acc, F1, F2, F3, F4, TrUserData)
+    when N < 57 ->
+    d_field_DisconnectRequest_path(Rest, N + 7,
+				   X bsl N + Acc, F1, F2, F3, F4, TrUserData);
+d_field_DisconnectRequest_path(<<0:1, X:7,
+				 Rest/binary>>,
+			       N, Acc, F1, F2, _, F4, TrUserData) ->
+    Len = X bsl N + Acc,
+    <<Utf8:Len/binary, Rest2/binary>> = Rest,
+    NewFValue = unicode:characters_to_list(Utf8, unicode),
+    dfp_read_field_def_DisconnectRequest(Rest2, 0, 0, F1,
+					 F2, NewFValue, F4, TrUserData).
+
+
+d_field_DisconnectRequest_headers(<<1:1, X:7,
+				    Rest/binary>>,
+				  N, Acc, F1, F2, F3, F4, TrUserData)
+    when N < 57 ->
+    d_field_DisconnectRequest_headers(Rest, N + 7,
+				      X bsl N + Acc, F1, F2, F3, F4,
+				      TrUserData);
+d_field_DisconnectRequest_headers(<<0:1, X:7,
+				    Rest/binary>>,
+				  N, Acc, F1, F2, F3, F4, TrUserData) ->
+    Len = X bsl N + Acc,
+    <<Bs:Len/binary, Rest2/binary>> = Rest,
+    NewFValue = id('d_msg_map<string,string>'(Bs,
+					      TrUserData),
+		   TrUserData),
+    dfp_read_field_def_DisconnectRequest(Rest2, 0, 0, F1,
+					 F2, F3,
+					 'tr_decode_repeated_add_elem_DisconnectRequest.headers'(NewFValue,
+												 F4,
+												 TrUserData),
 					 TrUserData).
 
 
 skip_varint_DisconnectRequest(<<1:1, _:7, Rest/binary>>,
-			      Z1, Z2, F1, F2, TrUserData) ->
-    skip_varint_DisconnectRequest(Rest, Z1, Z2, F1, F2,
-				  TrUserData);
+			      Z1, Z2, F1, F2, F3, F4, TrUserData) ->
+    skip_varint_DisconnectRequest(Rest, Z1, Z2, F1, F2, F3,
+				  F4, TrUserData);
 skip_varint_DisconnectRequest(<<0:1, _:7, Rest/binary>>,
-			      Z1, Z2, F1, F2, TrUserData) ->
+			      Z1, Z2, F1, F2, F3, F4, TrUserData) ->
     dfp_read_field_def_DisconnectRequest(Rest, Z1, Z2, F1,
-					 F2, TrUserData).
+					 F2, F3, F4, TrUserData).
 
 
 skip_length_delimited_DisconnectRequest(<<1:1, X:7,
 					  Rest/binary>>,
-					N, Acc, F1, F2, TrUserData)
+					N, Acc, F1, F2, F3, F4, TrUserData)
     when N < 57 ->
     skip_length_delimited_DisconnectRequest(Rest, N + 7,
-					    X bsl N + Acc, F1, F2, TrUserData);
+					    X bsl N + Acc, F1, F2, F3, F4,
+					    TrUserData);
 skip_length_delimited_DisconnectRequest(<<0:1, X:7,
 					  Rest/binary>>,
-					N, Acc, F1, F2, TrUserData) ->
+					N, Acc, F1, F2, F3, F4, TrUserData) ->
     Length = X bsl N + Acc,
     <<_:Length/binary, Rest2/binary>> = Rest,
     dfp_read_field_def_DisconnectRequest(Rest2, 0, 0, F1,
-					 F2, TrUserData).
+					 F2, F3, F4, TrUserData).
 
 
 skip_32_DisconnectRequest(<<_:32, Rest/binary>>, Z1, Z2,
-			  F1, F2, TrUserData) ->
+			  F1, F2, F3, F4, TrUserData) ->
     dfp_read_field_def_DisconnectRequest(Rest, Z1, Z2, F1,
-					 F2, TrUserData).
+					 F2, F3, F4, TrUserData).
 
 
 skip_64_DisconnectRequest(<<_:64, Rest/binary>>, Z1, Z2,
-			  F1, F2, TrUserData) ->
+			  F1, F2, F3, F4, TrUserData) ->
     dfp_read_field_def_DisconnectRequest(Rest, Z1, Z2, F1,
-					 F2, TrUserData).
+					 F2, F3, F4, TrUserData).
 
 
 
@@ -1524,10 +1628,14 @@ merge_msg_ConnectionRequest(#'ConnectionRequest'{path =
 merge_msg_DisconnectRequest(#'DisconnectRequest'{identifiers
 						     = PFidentifiers,
 						 subscriptions =
-						     PFsubscriptions},
+						     PFsubscriptions,
+						 path = PFpath,
+						 headers = PFheaders},
 			    #'DisconnectRequest'{identifiers = NFidentifiers,
 						 subscriptions =
-						     NFsubscriptions},
+						     NFsubscriptions,
+						 path = NFpath,
+						 headers = NFheaders},
 			    TrUserData) ->
     #'DisconnectRequest'{identifiers =
 			     if NFidentifiers =:= undefined -> PFidentifiers;
@@ -1535,7 +1643,15 @@ merge_msg_DisconnectRequest(#'DisconnectRequest'{identifiers
 			     end,
 			 subscriptions =
 			     'erlang_++'(PFsubscriptions, NFsubscriptions,
-					 TrUserData)}.
+					 TrUserData),
+			 path =
+			     if NFpath =:= undefined -> PFpath;
+				true -> NFpath
+			     end,
+			 headers =
+			     'tr_merge_DisconnectRequest.headers'(PFheaders,
+								  NFheaders,
+								  TrUserData)}.
 
 
 
@@ -1660,8 +1776,9 @@ v_msg_ConnectionRequest(#'ConnectionRequest'{path = F1,
 -dialyzer({nowarn_function,v_msg_DisconnectRequest/3}).
 v_msg_DisconnectRequest(#'DisconnectRequest'{identifiers
 						 = F1,
-					     subscriptions = F2},
-			Path, _) ->
+					     subscriptions = F2, path = F3,
+					     headers = F4},
+			Path, TrUserData) ->
     if F1 == undefined -> ok;
        true -> v_type_string(F1, [identifiers | Path])
     end,
@@ -1672,6 +1789,11 @@ v_msg_DisconnectRequest(#'DisconnectRequest'{identifiers
        true ->
 	   mk_type_error({invalid_list_of, string}, F2, Path)
     end,
+    if F3 == undefined -> ok;
+       true -> v_type_string(F3, [path | Path])
+    end,
+    'v_map<string,string>'(F4, [headers | Path],
+			   TrUserData),
     ok.
 
 -dialyzer({nowarn_function,v_enum_Status/2}).
@@ -1779,8 +1901,31 @@ cons(Elem, Acc, _TrUserData) -> [Elem | Acc].
 'tr_merge_ConnectionRequest.headers'(X1, X2, _) ->
     mt_merge_maptuples_r(X1, X2).
 
+-compile({inline,'tr_decode_init_default_DisconnectRequest.headers'/2}).
+'tr_decode_init_default_DisconnectRequest.headers'(_,
+						   _) ->
+    mt_empty_map_r().
+
+-compile({inline,'tr_decode_repeated_add_elem_DisconnectRequest.headers'/3}).
+'tr_decode_repeated_add_elem_DisconnectRequest.headers'(Elem,
+							L, _) ->
+    mt_add_item_r(Elem, L).
+
+-compile({inline,'tr_decode_repeated_finalize_DisconnectRequest.headers'/2}).
+'tr_decode_repeated_finalize_DisconnectRequest.headers'(L,
+							_) ->
+    mt_finalize_items_r(L).
+
+-compile({inline,'tr_merge_DisconnectRequest.headers'/3}).
+'tr_merge_DisconnectRequest.headers'(X1, X2, _) ->
+    mt_merge_maptuples_r(X1, X2).
+
 -compile({inline,'tr_encode_ConnectionRequest.headers[x]'/2}).
 'tr_encode_ConnectionRequest.headers[x]'(X, _) ->
+    mt_maptuple_to_pseudomsg_r(X, 'map<string,string>').
+
+-compile({inline,'tr_encode_DisconnectRequest.headers[x]'/2}).
+'tr_encode_DisconnectRequest.headers[x]'(X, _) ->
     mt_maptuple_to_pseudomsg_r(X, 'map<string,string>').
 
 -compile({inline,mt_maptuple_to_pseudomsg_r/2}).
@@ -1853,7 +1998,12 @@ get_msg_defs() ->
       [#field{name = identifiers, fnum = 1, rnum = 2,
 	      type = string, occurrence = optional, opts = []},
        #field{name = subscriptions, fnum = 2, rnum = 3,
-	      type = string, occurrence = repeated, opts = []}]}].
+	      type = string, occurrence = repeated, opts = []},
+       #field{name = path, fnum = 3, rnum = 4, type = string,
+	      occurrence = optional, opts = []},
+       #field{name = headers, fnum = 4, rnum = 5,
+	      type = {map, string, string}, occurrence = repeated,
+	      opts = []}]}].
 
 
 get_msg_names() ->
@@ -1923,7 +2073,12 @@ find_msg_def('DisconnectRequest') ->
     [#field{name = identifiers, fnum = 1, rnum = 2,
 	    type = string, occurrence = optional, opts = []},
      #field{name = subscriptions, fnum = 2, rnum = 3,
-	    type = string, occurrence = repeated, opts = []}];
+	    type = string, occurrence = repeated, opts = []},
+     #field{name = path, fnum = 3, rnum = 4, type = string,
+	    occurrence = optional, opts = []},
+     #field{name = headers, fnum = 4, rnum = 5,
+	    type = {map, string, string}, occurrence = repeated,
+	    opts = []}];
 find_msg_def(_) -> error.
 
 

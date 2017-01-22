@@ -56,7 +56,9 @@
 -define('DISCONNECTREQUEST_PB_H', true).
 -record('DisconnectRequest',
         {identifiers,                   % = 1, string (optional)
-         subscriptions = []             % = 2, [string]
+         subscriptions = [],            % = 2, [string]
+         path,                          % = 3, string (optional)
+         headers = []                   % = 4, [{map,string,string}]
         }).
 -endif.
 
