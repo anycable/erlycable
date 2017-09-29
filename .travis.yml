@@ -10,7 +10,7 @@ before_install:
   - gem install anycablebility
   - wget https://s3.amazonaws.com/rebar3/rebar3 
   - chmod +x rebar3
-script:
-  - "./rebar3 eunit"
-  - "./rebar3 ct"
-  - "anycablebility -c "rebar3 shell" --target-url="ws://localhost:8081/ws/cable" --wait-command=5"
+script: >
+  ./rebar3 eunit && 
+  ./rebar3 ct && 
+  anycablebility -c "rebar3 shell" --target-url="ws://localhost:8081/ws/cable" --wait-command=5
