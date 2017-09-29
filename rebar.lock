@@ -13,7 +13,7 @@
   2},
  {<<"deliverly">>,
   {git,"https://github.com/deliverly/deliverly-core.git",
-       {ref,"64c97484e1632ebd82c5e4bd6429addf036131eb"}},
+       {ref,"f50b0c939c3221342ec2be842cd8f873464c951d"}},
   0},
  {<<"eredis">>,{pkg,<<"eredis">>,<<"1.0.8">>},1},
  {<<"erlgrpc">>,
