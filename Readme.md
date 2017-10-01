@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/anycable/erlycable.svg?branch=master)](https://travis-ci.org/anycable/erlycable) 
+
 ErlyCable – Anycable Erlang Server
 =====
 
