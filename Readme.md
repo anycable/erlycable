@@ -5,23 +5,6 @@ ErlyCable – Anycable Erlang Server
 
 WebSocket server for [Anycable](https://github.com/anycable/anycable).
 
-## Installation
-
-TBD.
-
-## Usage
-
-TBD.
-
-## Build
-
-TBD.
-
-## Testing
-
-```shell
-rebar3 eunit && rebar3 ct
-```
 
 ## ActionCable Compatibility
 
