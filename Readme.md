@@ -3,8 +3,7 @@
 ErlyCable – Anycable Erlang Server
 =====
 
-WebSocket server for [Anycable](https://github.com/anycable/anycable).
-
+WebSocket server for [AnyCable](https://github.com/anycable/anycable) <= 0.5.x.
 
 ## ActionCable Compatibility
 
